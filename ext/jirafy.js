@@ -4,6 +4,17 @@
 var zGlb_ignoreElements = [],
     zGbl_PageChangedByAJAX_Timer, zGlb_projectKeys, zGlb_jiraServer, zGlb_targetWindow;
 
+var nodeInsertDetected = function(zEvent) {
+    if (zGbl_PageChangedByAJAX_Timer) {
+        clearTimeout (zGbl_PageChangedByAJAX_Timer);
+        zGbl_PageChangedByAJAX_Timer  = '';
+    }
+    zGbl_PageChangedByAJAX_Timer      = setTimeout (function() {handlePageChange (); }, 500);
+};
+
+
+
+
 /*
  * Extension Settings
  */
@@ -19,6 +30,27 @@ chrome.extension.sendRequest({method: "getJirafySettings"}, function(response) {
   }
 });
 
+//https://stackoverflow.com/questions/3522090/event-when-window-location-href-changes
+var oldHref = document.location.href;
+var watchUrlChange = function() {
+    var
+         bodyList = document.querySelector("body")
+        ,observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                if (oldHref != document.location.href) {
+                    oldHref = document.location.href;
+                    nodeInsertDetected(null);
+                }
+            });
+        });
+     var config = {
+        childList: true,
+        subtree: true
+    };
+    observer.observe(bodyList, config);
+};
+
+watchUrlChange();
 
 /*
  * Methods related to AJAX Events
@@ -33,14 +65,6 @@ var loadAJAXPage = function() {
     addDebouncedEventListener(document, "DOMNodeInserted", nodeInsertDetected, 1000);
 };
 
-var nodeInsertDetected = function(zEvent) {
-    if (zGbl_PageChangedByAJAX_Timer) {
-        clearTimeout (zGbl_PageChangedByAJAX_Timer);
-        zGbl_PageChangedByAJAX_Timer  = '';
-    }
-    zGbl_PageChangedByAJAX_Timer      = setTimeout (function() {handlePageChange (); }, 500);
-};
-
 var handlePageChange = function() {
     removeEventListener ("DOMNodeInserted", nodeInsertDetected, false);
     replaceTicketNumbersWithLinks(zGlb_projectKeys, zGlb_jiraServer, zGlb_targetWindow, zGlb_ignoreElements);
@@ -48,7 +72,6 @@ var handlePageChange = function() {
 
 var addDebouncedEventListener = function(obj, eventType, listener, delay) {
     var timer;
-    
     obj.addEventListener(eventType, function(evt) {
             if (timer) {
                 window.clearTimeout(timer);
